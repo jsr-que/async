@@ -1,41 +1,36 @@
-# Queue
+# @que/async
 
 An experimental project for printer queue implemntation in OmniWe POS.
 
-The idea is to utilize `jsr:@core/pipe` with the following functionalities:
-
-1. Interactive retries
-2. Peristence
-3. Fanout
-
-## Expected Usage
+## Usage
 
 ```typescript
 import { pipe } from "@core/pipe";
-import { exponentialBackoff, fork, retry } from "@que/async";
-import { sqlite } from "@que/sqlite/nitro";
-import { citizenPrinter } from "~/lib/print-streams/citizen";
-import { epsonPrinter } from "~/lib/print-streams/epson";
+import { exponentialBackoff, retry, triage } from "@que/async";
+import { sqlite } from "@que/async/sqlite/nitro";
+import { citizenPrinter } from "@que/printers/citizen";
+import { epsonPrinter } from "@que/printers/epson";
+
+const retryDelay = exponentialBackoff({
+  backoff: (n) => 2 ** n,
+  limit: Infinity,
+});
 
 const printStream = pipe(
   printEvents(),
   sqlite("PrintQueue"),
-  fork(
-    pipe(
-      filter((v) => v.target === "Printer A"),
-      retry(
-        citizenPrinter("TCP:1.2.3.4"),
-        exponentialBackoff((n) => 2 ** n),
-      ),
+  triage(
+    (v) => v.target === "Printer A",
+    retry(
+      citizenPrinter("TCP:1.2.3.4"),
+      retryDelay,
     ),
   ),
-  fork(
-    pipe(
-      filter((v) => v.target === "Printer B"),
-      retry(
-        epsonPrinter("TCP:5.6.7.8"),
-        exponentialBackoff((n) => 2 ** n),
-      ),
+  triage(
+    (v) => v.target === "Printer B",
+    retry(
+      epsonPrinter("TCP:5.6.7.8"),
+      retryDelay,
     ),
   ),
 );

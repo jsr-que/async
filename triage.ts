@@ -23,12 +23,10 @@ export const triage = <T>(
       masterIt.return();
     })();
 
-    const mux = new MuxAsyncIterator();
+    const mux = new MuxAsyncIterator<T>();
 
     mux.add(masterIt);
     mux.add(branch(branchIt));
 
-    for await (const value of mux) {
-      yield value;
-    }
+    yield* mux;
   };
