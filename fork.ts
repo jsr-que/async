@@ -4,7 +4,7 @@ export const fork = <T, U>(
   branch: (iterable: Iterable<T> | AsyncIterable<T>) => U,
 ) =>
   async function* (source: Iterable<T> | AsyncIterable<T>) {
-    const branchSource = createDeferredIterable<T>();
+    await using branchSource = createDeferredIterable<T>();
 
     branch(branchSource);
 

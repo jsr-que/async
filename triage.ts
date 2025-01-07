@@ -6,8 +6,8 @@ export const triage = <T>(
   branch: (iterable: Iterable<T> | AsyncIterable<T>) => AsyncIterable<T>,
 ) =>
   async function* (iterable: AsyncIterable<T>) {
-    const branchIt = createDeferredIterable<T>();
-    const masterIt = createDeferredIterable<T>();
+    await using branchIt = createDeferredIterable<T>();
+    await using masterIt = createDeferredIterable<T>();
 
     (async () => {
       let index = 0;
