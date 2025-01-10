@@ -7,6 +7,8 @@ export interface DeferredIterator<
   TNext = unknown,
 > extends AsyncIterator<T, TReturn, TNext>, AsyncDisposable {
   readonly active: boolean;
+  readonly backPressure: number;
+  readonly frontPressure: number;
   push: (value: T | Promise<T>) => void;
   return: NonNullable<AsyncIterator<T, TReturn, TNext>["return"]>;
 }
@@ -23,13 +25,9 @@ export const createDeferredIterator = <
   const frontPressure: PromiseWithResolvers<T>[] = [];
   const backPressure: Promise<T>[] = [];
   let returnValue: TReturn | undefined | symbol = activeSymbol;
-  let disposeTimer: number | undefined;
 
   return {
     async [Symbol.asyncDispose]() {
-      clearTimeout(disposeTimer);
-      disposeTimer = 1;
-
       await this.return();
       await options?.dispose?.();
     },
@@ -46,8 +44,8 @@ export const createDeferredIterator = <
         // compat for runtimes without `await using`
         // 1. Users must call return() manually
         // 2. 100ms should be enough for multiple macrotasks
-        if (options?.dispose) {
-          disposeTimer ??= setTimeout(() => options?.dispose?.(), 100);
+        if (options?.dispose && !("asyncDispose" in Symbol)) {
+          setTimeout(() => options?.dispose?.(), 100);
         }
       }
 
@@ -62,6 +60,8 @@ export const createDeferredIterator = <
         return { done: true, value: returnValue as TReturn };
       }
 
+      // This allows multiple pending .next() without awaiting the previous one.
+      // `for await ... of` doesn't do that, but possible manually.
       const deferred = Promise.withResolvers<T>();
 
       frontPressure.push(deferred);
@@ -81,9 +81,8 @@ export const createDeferredIterator = <
       }
 
       if (frontPressure.length > 0) {
-        frontPressure.shift()!.resolve(
-          value,
-        );
+        frontPressure.shift()!
+          .resolve(value);
       } else {
         backPressure.push(
           Promise.resolve(value),
@@ -92,6 +91,12 @@ export const createDeferredIterator = <
     },
     get active() {
       return returnValue === activeSymbol;
+    },
+    get backPressure() {
+      return backPressure.length;
+    },
+    get frontPressure() {
+      return frontPressure.length;
     },
   };
 };

@@ -1,3 +1,4 @@
+import { delay } from "@std/async";
 import { createDeferredIterable } from "./deferred-iterable.ts";
 
 export const fork = <T, U>(
@@ -9,7 +10,10 @@ export const fork = <T, U>(
     branch(branchSource);
 
     for await (const value of source) {
-      // FIXME: pipe feeding with no backpressure
+      while (branchSource.backPressure > 5) {
+        await delay(80);
+      }
+
       branchSource.push(value);
 
       yield value;
