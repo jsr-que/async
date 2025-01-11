@@ -1,27 +1,25 @@
+/**
+ * @module
+ *
+ * Async iterable pipe with values persisted using `expo-sqlite`.
+ */
+
 import { monotonicUlid } from "@std/ulid";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 import type { JsonObject } from "type-fest";
+import type { AsyncIterablePipe } from "../common.ts";
 import { persisted } from "../persisted.ts";
+import type { PersistedMessage } from "./common.ts";
 
-export type Message = {
-  /** ULID */
-  id: string;
-
-  createdAt: string;
-
-  /** Soft-delete after successful processing */
-  deletedAt?: string;
-
-  /** JSON message content */
-  content: string;
-};
-
-export interface DisposableDatabase extends SQLiteDatabase, AsyncDisposable {}
+/**
+ * Disposable SQLite database with `expo-sqlite` implementation.
+ */
+export interface DisposableExpoSQLite extends SQLiteDatabase, AsyncDisposable {}
 
 const createConnection = async (
   database: string,
   location?: string,
-): Promise<DisposableDatabase> => {
+): Promise<DisposableExpoSQLite> => {
   const db = await openDatabaseAsync(database, undefined, location);
 
   return Object.assign(db, {
@@ -31,15 +29,18 @@ const createConnection = async (
   });
 };
 
+/**
+ * An async iterable stream persisted with `expo-sqlite`.
+ */
 export const sqlite = <T>(
   database: string,
   location?: string,
-): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> => {
-  const activeDb = new WeakSet<DisposableDatabase>();
+): AsyncIterablePipe<T> => {
+  const activeDb = new WeakSet<DisposableExpoSQLite>();
 
-  let lastMessage: Message | null = null;
+  let lastMessage: PersistedMessage | null = null;
 
-  return persisted<T, DisposableDatabase>({
+  return persisted<T, DisposableExpoSQLite>({
     async initialize() {
       const db = await createConnection(database, location);
 
@@ -91,7 +92,7 @@ export const sqlite = <T>(
       }
 
       while (activeDb.has(this)) {
-        const row = await this.getFirstAsync<Message>(/* SQL */ `
+        const row = await this.getFirstAsync<PersistedMessage>(/* SQL */ `
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
           ORDER BY createdAt

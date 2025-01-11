@@ -1,38 +1,35 @@
+/**
+ * @module
+ *
+ * Async iterable pipe with values persisted using `@db/sqlite`.
+ */
+
 import { Database } from "@db/sqlite";
 import { delay } from "@std/async";
 import { monotonicUlid } from "@std/ulid";
 import type { JsonObject } from "type-fest";
 import { persisted } from "../persisted.ts";
+import type { PersistedMessage } from "./common.ts";
 
-export class DisposableDatabase extends Database implements Disposable {
+/**
+ * Disposable SQLite database with `@db/sqlite` implementation.
+ */
+export class DisposableSQLite3 extends Database implements Disposable {
   [Symbol.dispose]() {
     this.close();
   }
 }
 
-export type Message = {
-  /** ULID */
-  id: string;
-
-  createdAt: string;
-
-  /** Soft-delete after successful processing */
-  deletedAt: string | null;
-
-  /** JSON message content */
-  content: JsonObject;
-};
-
 export const sqlite = <T>(filename: string): <TReturn, TNext>(
   it: Iterable<T> | AsyncIterable<T>,
 ) => AsyncGenerator<T, TReturn, TNext> => {
-  const activeDb = new WeakSet<DisposableDatabase>();
+  const activeDb = new WeakSet<DisposableSQLite3>();
 
-  let lastMessage: Message | undefined = undefined;
+  let lastMessage: PersistedMessage | undefined = undefined;
 
-  return persisted<T, DisposableDatabase>({
+  return persisted<T, DisposableSQLite3>({
     initialize: () => {
-      const db = new DisposableDatabase(filename);
+      const db = new DisposableSQLite3(filename);
 
       db.run(/* SQL */ `
         PRAGMA journal_mode=WAL;
@@ -82,7 +79,7 @@ export const sqlite = <T>(filename: string): <TReturn, TNext>(
       }
 
       while (activeDb.has(this)) {
-        [lastMessage] = this.sql<Message>`
+        [lastMessage] = this.sql<PersistedMessage>`
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
           ORDER BY createdAt

@@ -1,3 +1,9 @@
+/**
+ * @module
+ *
+ * Async iterable pipe with values persisted using `react-native-nitro-sqlite`.
+ */
+
 import { monotonicUlid } from "@std/ulid";
 import {
   type BatchQueryCommand,
@@ -11,22 +17,11 @@ import {
   type Transaction,
 } from "react-native-nitro-sqlite";
 import type { JsonObject } from "type-fest";
+import type { AsyncIterablePipe } from "../common.ts";
 import { persisted } from "../persisted.ts";
+import type { PersistedMessage } from "./common.ts";
 
-export type Message = {
-  /** ULID */
-  id: string;
-
-  createdAt: string;
-
-  /** Soft-delete after successful processing */
-  deletedAt?: string;
-
-  /** JSON message content */
-  content: string;
-};
-
-export class DisposableDatabase implements Disposable {
+export class DisposableNitroSQLite implements Disposable {
   #db: NitroSQLiteConnection;
 
   constructor(database: string, location?: string) {
@@ -76,14 +71,14 @@ export class DisposableDatabase implements Disposable {
 export const sqlite = <T>(
   database: string,
   location?: string,
-): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> => {
-  const activeDb = new WeakSet<DisposableDatabase>();
+): AsyncIterablePipe<T> => {
+  const activeDb = new WeakSet<DisposableNitroSQLite>();
 
-  let lastMessage: Message | undefined = undefined;
+  let lastMessage: PersistedMessage | undefined = undefined;
 
-  return persisted<T, DisposableDatabase>({
+  return persisted<T, DisposableNitroSQLite>({
     async initialize() {
-      const db = new DisposableDatabase(database, location);
+      const db = new DisposableNitroSQLite(database, location);
 
       await db.execute(/* SQL */ `
         PRAGMA journal_mode=WAL;
@@ -133,7 +128,7 @@ export const sqlite = <T>(
       }
 
       while (activeDb.has(this)) {
-        const { rows } = await this.execute<Message>(/* SQL */ `
+        const { rows } = await this.execute<PersistedMessage>(/* SQL */ `
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
           ORDER BY createdAt

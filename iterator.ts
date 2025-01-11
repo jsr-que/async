@@ -1,27 +1,50 @@
+import {
+  type PromiseWithResolvers,
+  promiseWithResolvers,
+} from "./lib/dnt-shim.ts";
+
 /** Indicates the iterator is still in active state. */
 const activeSymbol = Symbol();
 
-export interface DeferredIterator<
+/**
+ * Async iterator with manual resolvers exposed.
+ *
+ * The Promise.withResolvers counterpart for async iterators.
+ */
+export interface AsyncIteratorWithResolvers<
   T,
   TReturn = unknown,
   TNext = unknown,
 > extends AsyncIterator<T, TReturn, TNext>, AsyncDisposable {
+  /** Indicates the iterator is not closed by return(). */
   readonly active: boolean;
+  /** Number of values waiting to be consumed via .push(). */
   readonly backPressure: number;
+  /** Number of consumers waiting for values via .next(). */
   readonly frontPressure: number;
+  /** Push a value to the iterator. */
   push: (value: T | Promise<T>) => void;
+  /** Close the iterator. */
   return: NonNullable<AsyncIterator<T, TReturn, TNext>["return"]>;
 }
 
-export interface DeferredIteratorOptions {
+/**
+ * Options for async iterator with resolvers.
+ */
+export interface AsyncIteratorWithResolversOptions {
   readonly dispose?: () => void | Promise<void>;
 }
 
-export const createDeferredIterator = <
+/**
+ * Create an async iterator for deferred iterator.
+ */
+export const asyncIteratorWithResolvers = <
   T,
   TReturn = unknown,
   TNext = unknown,
->(options?: DeferredIteratorOptions): DeferredIterator<T, TReturn, TNext> => {
+>(
+  options?: AsyncIteratorWithResolversOptions,
+): AsyncIteratorWithResolvers<T, TReturn, TNext> => {
   const frontPressure: PromiseWithResolvers<T>[] = [];
   const backPressure: Promise<T>[] = [];
   let returnValue: TReturn | undefined | symbol = activeSymbol;
@@ -62,7 +85,7 @@ export const createDeferredIterator = <
 
       // This allows multiple pending .next() without awaiting the previous one.
       // `for await ... of` doesn't do that, but possible manually.
-      const deferred = Promise.withResolvers<T>();
+      const deferred = promiseWithResolvers<T>();
 
       frontPressure.push(deferred);
 
@@ -97,6 +120,43 @@ export const createDeferredIterator = <
     },
     get frontPressure() {
       return frontPressure.length;
+    },
+  };
+};
+
+/**
+ * Async iterable iterator with manual resolvers exposed.
+ */
+export interface AsyncIterableIteratorWithResolvers<
+  T,
+  TReturn = unknown,
+  TNext = unknown,
+> extends AsyncIteratorWithResolvers<T, TReturn, TNext> {
+  [Symbol.asyncIterator](): AsyncIterableIteratorWithResolvers<
+    T,
+    TReturn,
+    TNext
+  >;
+}
+
+/**
+ * Create an async iterator for deferred iterable.
+ *
+ * Manually push values to the iterator and closes it when done.
+ */
+export const asyncIterableIteratorWithResolvers = <
+  T,
+  TReturn = unknown,
+  TNext = unknown,
+>(
+  options?: AsyncIteratorWithResolversOptions,
+): AsyncIterableIteratorWithResolvers<T, TReturn, TNext> => {
+  const iterator = asyncIteratorWithResolvers<T, TReturn, TNext>(options);
+
+  return {
+    ...iterator,
+    [Symbol.asyncIterator]() {
+      return this;
     },
   };
 };

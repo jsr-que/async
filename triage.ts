@@ -1,13 +1,18 @@
 import { MuxAsyncIterator } from "@std/async";
-import { createDeferredIterable } from "./deferred-iterable.ts";
+import type { AsyncIterablePipe } from "./common.ts";
+import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
 
+/**
+ * Branches an iterator value when the value passes the provided filter
+ * function, otherwise bypass the branch and yield.
+ */
 export const triage = <T>(
   filter: (event: T, index: number) => boolean | Promise<boolean>,
-  branch: (iterable: Iterable<T> | AsyncIterable<T>) => AsyncIterable<T>,
-): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> =>
+  branch: AsyncIterablePipe<T>,
+): AsyncIterablePipe<T> =>
   async function* (iterable) {
-    await using branchIt = createDeferredIterable<T>();
-    await using masterIt = createDeferredIterable<T>();
+    await using branchIt = asyncIterableIteratorWithResolvers<T>();
+    await using masterIt = asyncIterableIteratorWithResolvers<T>();
 
     (async () => {
       let index = 0;

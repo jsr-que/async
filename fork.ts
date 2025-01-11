@@ -1,11 +1,12 @@
 import { delay } from "@std/async";
-import { createDeferredIterable } from "./deferred-iterable.ts";
+import type { AsyncIterablePipe } from "./common.ts";
+import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
 
 export const fork = <T, U>(
-  branch: (iterable: Iterable<T> | AsyncIterable<T>) => U,
-): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> =>
+  branch: AsyncIterablePipe<T, U>,
+): AsyncIterablePipe<T> =>
   async function* (source) {
-    await using branchSource = createDeferredIterable<T>();
+    await using branchSource = asyncIterableIteratorWithResolvers<T>();
 
     branch(branchSource);
 

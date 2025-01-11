@@ -17,7 +17,8 @@
   "exports": {
     ".": "./mod.ts",
     "./sqlite/expo": "./sqlite/expo.ts",
-    "./sqlite/nitro": "./sqlite/nitro.ts"
+    "./sqlite/nitro": "./sqlite/nitro.ts",
+    "./sqlite/sqlite3": "./sqlite/sqlite3.ts"
   },
   "lint": {
     "rules": {
