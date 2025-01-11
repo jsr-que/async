@@ -2,6 +2,9 @@ import { delay } from "@std/async";
 import type { AsyncIterablePipe } from "./common.ts";
 import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
 
+/**
+ * Forks the source iterable into two branches.
+ */
 export const fork = <T, U>(
   branch: AsyncIterablePipe<T, U>,
 ): AsyncIterablePipe<T> =>

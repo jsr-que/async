@@ -20,6 +20,9 @@ export class DisposableSQLite3 extends Database implements Disposable {
   }
 }
 
+/**
+ * Async iterable pipe with values persisted using `@db/sqlite`.
+ */
 export const sqlite = <T>(filename: string): <TReturn, TNext>(
   it: Iterable<T> | AsyncIterable<T>,
 ) => AsyncGenerator<T, TReturn, TNext> => {

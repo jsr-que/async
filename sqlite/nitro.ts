@@ -21,6 +21,9 @@ import type { AsyncIterablePipe } from "../common.ts";
 import { persisted } from "../persisted.ts";
 import type { PersistedMessage } from "./common.ts";
 
+/**
+ * Disposable SQLite connection with `react-native-nitro-sqlite`.
+ */
 export class DisposableNitroSQLite implements Disposable {
   #db: NitroSQLiteConnection;
 
@@ -68,6 +71,9 @@ export class DisposableNitroSQLite implements Disposable {
   }
 }
 
+/**
+ * Async iterable pipe with values persisted using `react-native-nitro-sqlite`.
+ */
 export const sqlite = <T>(
   database: string,
   location?: string,
