@@ -1,8 +1,3 @@
-import {
-  type PromiseWithResolvers,
-  promiseWithResolvers,
-} from "./lib/dnt-shim.ts";
-
 /** Indicates the iterator is still in active state. */
 const activeSymbol = Symbol();
 
@@ -85,7 +80,7 @@ export const asyncIteratorWithResolvers = <
 
       // This allows multiple pending .next() without awaiting the previous one.
       // `for await ... of` doesn't do that, but possible manually.
-      const deferred = promiseWithResolvers<T>();
+      const deferred = Promise.withResolvers<T>();
 
       frontPressure.push(deferred);
 
