@@ -1,7 +1,7 @@
 import { delay } from "@std/async";
 import { pipe } from "jsr:@core/pipe";
 import { assertEquals } from "jsr:@std/assert";
-import { DisposableDatabase, sqlite } from "./sqlite3.ts";
+import { DisposableSQLite3, sqlite } from "./sqlite3.ts";
 
 Deno.test("sqlite", async (t) => {
   const filename = await Deno.makeTempFile({ suffix: ".sqlite" });
@@ -27,7 +27,7 @@ Deno.test("sqlite", async (t) => {
 
     // Check current local database state.
     {
-      using db = new DisposableDatabase(filename);
+      using db = new DisposableSQLite3(filename);
       const results = db.sql<
         { content: number }
       >`SELECT content FROM Messages WHERE deletedAt IS NULL`
@@ -60,7 +60,7 @@ Deno.test("sqlite", async (t) => {
 
     // Check current local database state.
     {
-      using db = new DisposableDatabase(filename);
+      using db = new DisposableSQLite3(filename);
       const results = db.sql<
         { content: number }
       >`SELECT content FROM Messages WHERE deletedAt IS NULL`

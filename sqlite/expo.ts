@@ -1,86 +1,50 @@
 /**
  * @module
  *
- * Async iterable pipe with values persisted using `react-native-nitro-sqlite`.
+ * Async iterable pipe with values persisted using `expo-sqlite`.
  */
 
 import { monotonicUlid } from "@std/ulid";
-import {
-  type BatchQueryCommand,
-  type BatchQueryResult,
-  type FileLoadResult,
-  type NitroSQLiteConnection,
-  open,
-  type QueryResult,
-  type SQLiteItem,
-  type SQLiteQueryParams,
-  type Transaction,
-} from "react-native-nitro-sqlite";
+import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 import type { JsonObject } from "type-fest";
 import type { AsyncIterablePipe } from "../common.ts";
 import { persisted } from "../persisted.ts";
 import type { PersistedMessage } from "./common.ts";
 
-export class DisposableNitroSQLite implements Disposable {
-  #db: NitroSQLiteConnection;
+/**
+ * Disposable SQLite database with `expo-sqlite` implementation.
+ */
+export interface DisposableExpoSQLite extends SQLiteDatabase, AsyncDisposable {}
 
-  constructor(database: string, location?: string) {
-    this.#db = open({ name: database, location });
-  }
+const createConnection = async (
+  database: string,
+  location?: string,
+): Promise<DisposableExpoSQLite> => {
+  const db = await openDatabaseAsync(database, undefined, location);
 
-  [Symbol.dispose]() {
-    this.close();
-  }
+  return Object.assign(db, {
+    async [Symbol.asyncDispose]() {
+      await db.closeAsync();
+    },
+  });
+};
 
-  close() {
-    this.#db.close();
-  }
-
-  delete() {
-    this.#db.delete();
-  }
-
-  attach(database: string, alias: string, location?: string) {
-    this.#db.attach(database, alias, location);
-  }
-
-  detach(alias: string) {
-    this.#db.detach(alias);
-  }
-
-  transaction(fn: (tx: Transaction) => Promise<void> | void): Promise<void> {
-    return this.#db.transaction(fn);
-  }
-
-  execute<RowData extends SQLiteItem = SQLiteItem>(
-    query: string,
-    params?: SQLiteQueryParams,
-  ): Promise<QueryResult<RowData>> {
-    return this.#db.executeAsync<RowData>(query, params);
-  }
-
-  executeBatch(commands: BatchQueryCommand[]): Promise<BatchQueryResult> {
-    return this.#db.executeBatchAsync(commands);
-  }
-
-  loadFile(location: string): Promise<FileLoadResult> {
-    return this.#db.loadFileAsync(location);
-  }
-}
-
+/**
+ * An async iterable stream persisted with `expo-sqlite`.
+ */
 export const sqlite = <T>(
   database: string,
   location?: string,
 ): AsyncIterablePipe<T> => {
-  const activeDb = new WeakSet<DisposableNitroSQLite>();
+  const activeDb = new WeakSet<DisposableExpoSQLite>();
 
-  let lastMessage: PersistedMessage | undefined = undefined;
+  let lastMessage: PersistedMessage | null = null;
 
-  return persisted<T, DisposableNitroSQLite>({
+  return persisted<T, DisposableExpoSQLite>({
     async initialize() {
-      const db = new DisposableNitroSQLite(database, location);
+      const db = await createConnection(database, location);
 
-      await db.execute(/* SQL */ `
+      await db.execAsync(/* SQL */ `
         PRAGMA journal_mode=WAL;
 
         CREATE TABLE IF NOT EXISTS Messages (
@@ -107,7 +71,7 @@ export const sqlite = <T>(
 
       const contents = JSON.stringify(message);
 
-      await this.execute(/* SQL */ `
+      await this.execAsync(/* SQL */ `
         INSERT INTO Messages (id, content)
           VALUES (${id}, ${contents})
         ON CONFLICT (id) DO UPDATE SET
@@ -120,7 +84,7 @@ export const sqlite = <T>(
     },
     async dequeue() {
       if (lastMessage) {
-        await this.execute(/* SQL */ `
+        await this.execAsync(/* SQL */ `
           UPDATE Messages
           SET deletedAt = CURRENT_TIMESTAMP
           WHERE id = ${lastMessage.id};
@@ -128,14 +92,14 @@ export const sqlite = <T>(
       }
 
       while (activeDb.has(this)) {
-        const { rows } = await this.execute<PersistedMessage>(/* SQL */ `
+        const row = await this.getFirstAsync<PersistedMessage>(/* SQL */ `
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
           ORDER BY createdAt
           LIMIT 1
         `);
 
-        lastMessage = rows?.item(0);
+        lastMessage = row;
 
         if (lastMessage) {
           return JSON.parse(lastMessage.content) as T;

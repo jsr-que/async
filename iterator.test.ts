@@ -1,9 +1,9 @@
 import { delay } from "@std/async";
 import { assertEquals } from "jsr:@std/assert@0.224";
-import { createDeferredIterable } from "./deferred-iterable.ts";
+import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
 
 Deno.test("should iterate values", async () => {
-  await using iter = createDeferredIterable<number>();
+  await using iter = asyncIterableIteratorWithResolvers<number>();
   const result: unknown[] = [];
 
   const promise = (async () => {
@@ -26,7 +26,7 @@ Deno.test("should iterate values", async () => {
 });
 
 Deno.test("should allow break outs", async () => {
-  await using iter = createDeferredIterable<number>();
+  await using iter = asyncIterableIteratorWithResolvers<number>();
   const result: unknown[] = [];
 
   const promise = (async () => {
@@ -52,7 +52,7 @@ Deno.test("should allow break outs", async () => {
 Deno.test(
   "should allow concurrent .next() and multiple .return()",
   async () => {
-    await using iter = createDeferredIterable<number>();
+    await using iter = asyncIterableIteratorWithResolvers<number>();
 
     const promise = (async () => {
       iter.push(1);

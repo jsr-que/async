@@ -1,11 +1,17 @@
 import { delay } from "@std/async";
-import type { Promisable } from "./common.ts";
-import { createDeferredIterable } from "./deferred-iterable.ts";
+import type { AsyncIterablePipe, Promisable } from "./common.ts";
+import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
 
+/**
+ * Options for creating a new RetryError.
+ */
 export interface RetryErrorOptions extends ErrorOptions {
   attempts: number;
 }
 
+/**
+ * Error thrown when the maximum number of retries is exceeded.
+ */
 export class RetryError extends Error {
   constructor(message?: string, options?: RetryErrorOptions) {
     super(message, options);
@@ -21,12 +27,23 @@ export class RetryError extends Error {
   }
 }
 
+/**
+ * Function that controls when and if a retry should be attempted.
+ *
+ * Hold on retrying with an internal delay, or return falsy values to stop
+ * retrying.
+ *
+ * A `RetryError` will be thrown when retries are stopped.
+ */
 export type RetryHandler<T> = (
   attempt: number,
   error: Error,
   message: T,
 ) => Promisable<boolean | void>;
 
+/**
+ * Creates an exponential backoff function with jitter.
+ */
 export const exponentialBackoff = <T>({
   backoff,
   jitter = 0.3, // ±30%
@@ -69,14 +86,17 @@ async (attempt: number, error: Error, _: T) => {
   return true;
 };
 
+/**
+ * Forwards the values of a provided async iterator with auto-retry.
+ */
 export const retry = <T>(
   target: (iterable: AsyncIterable<T>) => AsyncIteratorObject<T>,
   retryHandler: RetryHandler<T> = exponentialBackoff({
     backoff: (attempt) => attempt ** 3, // 1, 8, 27, 64, 125, 216, 343, 512, 729, 1000, ...
   }),
-): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> =>
+): AsyncIterablePipe<T> =>
   async function* (source) {
-    let retrySource = createDeferredIterable<T>();
+    let retrySource = asyncIterableIteratorWithResolvers<T>();
     let iterator = target(retrySource);
     let attempt = 0;
 
@@ -100,7 +120,7 @@ export const retry = <T>(
             throw e;
           }
 
-          retrySource = createDeferredIterable<T>();
+          retrySource = asyncIterableIteratorWithResolvers<T>();
           iterator = target(retrySource);
         }
       }
