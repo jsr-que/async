@@ -1,5 +1,6 @@
 {
   "name": "@que/async",
+  "description": "Stream piping utilities for async iterators",
   "version": "0.0.0-development",
   "nodeModulesDir": "auto",
   "lock": true,
@@ -8,13 +9,13 @@
     "@std/async": "jsr:@std/async@^1.0.9",
     "@std/path": "jsr:@std/path@^1.0.8",
     "@std/ulid": "jsr:@std/ulid@^1.0.0",
-    "react-native-nitro-modules": "npm:react-native-nitro-modules@^0.20.1",
+    "react-native-nitro-modules": "npm:react-native-nitro-modules@^0.21.0",
     "react-native-nitro-sqlite": "npm:react-native-nitro-sqlite@^9.1.1",
     "type-fest": "npm:type-fest@^4.31.0"
   },
   "exports": {
     ".": "./mod.ts",
-    "./sqlite/*": "./sqlite/*"
+    "./sqlite/nitro": "./sqlite/nitro.ts"
   },
   "lint": {
     "rules": {
