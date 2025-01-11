@@ -9,12 +9,14 @@
     "@std/async": "jsr:@std/async@^1.0.9",
     "@std/path": "jsr:@std/path@^1.0.8",
     "@std/ulid": "jsr:@std/ulid@^1.0.0",
+    "expo-sqlite": "npm:expo-sqlite@^15.0.5",
     "react-native-nitro-modules": "npm:react-native-nitro-modules@^0.21.0",
     "react-native-nitro-sqlite": "npm:react-native-nitro-sqlite@^9.1.1",
     "type-fest": "npm:type-fest@^4.31.0"
   },
   "exports": {
     ".": "./mod.ts",
+    "./sqlite/expo": "./sqlite/expo.ts",
     "./sqlite/nitro": "./sqlite/nitro.ts"
   },
   "lint": {
