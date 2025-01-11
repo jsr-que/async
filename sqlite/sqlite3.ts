@@ -2,7 +2,7 @@ import { Database } from "@db/sqlite";
 import { delay } from "@std/async";
 import { monotonicUlid } from "@std/ulid";
 import type { JsonObject } from "type-fest";
-import { persisted } from "./persisted.ts";
+import { persisted } from "../persisted.ts";
 
 export class DisposableDatabase extends Database implements Disposable {
   [Symbol.dispose]() {
@@ -23,7 +23,9 @@ export type Message = {
   content: JsonObject;
 };
 
-export const sqlite = <T>(filename: string) => {
+export const sqlite = <T>(filename: string): <TReturn, TNext>(
+  it: Iterable<T> | AsyncIterable<T>,
+) => AsyncGenerator<T, TReturn, TNext> => {
   const activeDb = new WeakSet<DisposableDatabase>();
 
   let lastMessage: Message | undefined = undefined;

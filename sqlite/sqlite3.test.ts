@@ -1,7 +1,7 @@
 import { delay } from "@std/async";
 import { pipe } from "jsr:@core/pipe";
 import { assertEquals } from "jsr:@std/assert";
-import { DisposableDatabase, sqlite } from "./sqlite.ts";
+import { DisposableDatabase, sqlite } from "./sqlite3.ts";
 
 Deno.test("sqlite", async (t) => {
   const filename = await Deno.makeTempFile({ suffix: ".sqlite" });
@@ -35,7 +35,7 @@ Deno.test("sqlite", async (t) => {
       assertEquals(results, [2, 3]);
     }
 
-    stream.return();
+    stream.return(undefined);
 
     // Prevent timer leaks in `numbers()` above
     await delay(100);

@@ -1,8 +1,11 @@
 import { monotonicUlid } from "@std/ulid";
 import {
   type BatchQueryCommand,
+  type BatchQueryResult,
+  type FileLoadResult,
   type NitroSQLiteConnection,
   open,
+  type QueryResult,
   type SQLiteItem,
   type SQLiteQueryParams,
   type Transaction,
@@ -50,27 +53,30 @@ export class DisposableDatabase implements Disposable {
     this.#db.detach(alias);
   }
 
-  transaction(fn: (tx: Transaction) => Promise<void> | void) {
+  transaction(fn: (tx: Transaction) => Promise<void> | void): Promise<void> {
     return this.#db.transaction(fn);
   }
 
   execute<RowData extends SQLiteItem = SQLiteItem>(
     query: string,
     params?: SQLiteQueryParams,
-  ) {
+  ): Promise<QueryResult<RowData>> {
     return this.#db.executeAsync<RowData>(query, params);
   }
 
-  executeBatch(commands: BatchQueryCommand[]) {
+  executeBatch(commands: BatchQueryCommand[]): Promise<BatchQueryResult> {
     return this.#db.executeBatchAsync(commands);
   }
 
-  loadFile(location: string) {
+  loadFile(location: string): Promise<FileLoadResult> {
     return this.#db.loadFileAsync(location);
   }
 }
 
-export const sqlite = <T>(database: string, location?: string) => {
+export const sqlite = <T>(
+  database: string,
+  location?: string,
+): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> => {
   const activeDb = new WeakSet<DisposableDatabase>();
 
   let lastMessage: Message | undefined = undefined;

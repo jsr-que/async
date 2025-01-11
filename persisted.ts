@@ -23,9 +23,11 @@ export type PersistedOptionsInitializable<Message> = {
   return?: () => Promisable<void>;
 };
 
-export type PersistedReturnType<Message> = (
-  iterable: Iterable<Message> | AsyncIterable<Message>,
-) => AsyncGenerator<Message, void, unknown>;
+export type PersistedReturnType<T> = <TReturn, TNext>(
+  iterable:
+    | Iterable<T, TReturn, TNext>
+    | AsyncIterable<T, TReturn, TNext>,
+) => AsyncGenerator<T, TReturn, TNext>;
 
 export function persisted<Message>(
   options: PersistedOptionsInitializable<Message>,

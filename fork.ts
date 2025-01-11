@@ -3,8 +3,8 @@ import { createDeferredIterable } from "./deferred-iterable.ts";
 
 export const fork = <T, U>(
   branch: (iterable: Iterable<T> | AsyncIterable<T>) => U,
-) =>
-  async function* (source: Iterable<T> | AsyncIterable<T>) {
+): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> =>
+  async function* (source) {
     await using branchSource = createDeferredIterable<T>();
 
     branch(branchSource);

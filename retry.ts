@@ -16,7 +16,7 @@ export class RetryError extends Error {
 
   #attempts = 0;
 
-  get attempts() {
+  get attempts(): number {
     return this.#attempts;
   }
 }
@@ -27,7 +27,7 @@ export type RetryHandler<T> = (
   message: T,
 ) => Promisable<boolean | void>;
 
-export const exponentialBackoff = ({
+export const exponentialBackoff = <T>({
   backoff,
   jitter = 0.3, // ±30%
   limit = 5,
@@ -52,8 +52,8 @@ export const exponentialBackoff = ({
    * @default 5
    */
   limit?: number;
-}) =>
-async <T>(attempt: number, error: Error, _: T) => {
+}): RetryHandler<T> =>
+async (attempt: number, error: Error, _: T) => {
   if (attempt > limit) {
     throw new RetryError(error.message, {
       cause: error,
@@ -74,8 +74,8 @@ export const retry = <T>(
   retryHandler: RetryHandler<T> = exponentialBackoff({
     backoff: (attempt) => attempt ** 3, // 1, 8, 27, 64, 125, 216, 343, 512, 729, 1000, ...
   }),
-) =>
-  async function* (source: AsyncIterable<T>) {
+): (it: Iterable<T> | AsyncIterable<T>) => AsyncGenerator<T> =>
+  async function* (source) {
     let retrySource = createDeferredIterable<T>();
     let iterator = target(retrySource);
     let attempt = 0;
