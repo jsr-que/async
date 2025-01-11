@@ -1,7 +1,7 @@
 {
   "name": "@que/async",
   "description": "Stream piping utilities for async iterators",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "nodeModulesDir": "auto",
   "lock": true,
   "imports": {
