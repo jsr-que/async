@@ -35,7 +35,7 @@ Deno.test("sqlite", async (t) => {
       assertEquals(results, [2, 3]);
     }
 
-    stream.return(undefined);
+    stream.return?.(undefined);
 
     // Prevent timer leaks in `numbers()` above
     await delay(100);

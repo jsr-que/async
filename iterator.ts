@@ -1,5 +1,9 @@
+import { Queue } from "@core/asyncutil/queue";
+import { delay } from "@std/async";
+import type { Promisable } from "type-fest";
+
 /** Indicates the iterator is still in active state. */
-const activeSymbol = Symbol();
+const returnSymbol = Symbol.for("AsyncIterator.return");
 
 /**
  * Async iterator with manual resolvers exposed.
@@ -20,14 +24,23 @@ export interface AsyncIteratorWithResolvers<
   /** Push a value to the iterator. */
   push: (value: T | Promise<T>) => void;
   /** Close the iterator. */
-  return: NonNullable<AsyncIterator<T, TReturn, TNext>["return"]>;
+  return(
+    value?: Promisable<TReturn>,
+    /**
+     * Drop pending values in the queue, specify false to let the iterator
+     * finish gracefully.
+     *
+     * @default true
+     */
+    force?: boolean,
+  ): Promise<IteratorResult<T, TReturn>>;
 }
 
 /**
  * Options for async iterator with resolvers.
  */
 export interface AsyncIteratorWithResolversOptions {
-  readonly dispose?: () => void | Promise<void>;
+  readonly dispose?: () => Promisable<void>;
 }
 
 /**
@@ -40,24 +53,34 @@ export const asyncIteratorWithResolvers = <
 >(
   options?: AsyncIteratorWithResolversOptions,
 ): AsyncIteratorWithResolvers<T, TReturn, TNext> => {
-  const frontPressure: PromiseWithResolvers<T>[] = [];
-  const backPressure: Promise<T>[] = [];
-  let returnValue: TReturn | undefined | symbol = activeSymbol;
+  const queue = new Queue<Promise<T> | typeof returnSymbol>();
+
+  let frontPressure = 0;
+
+  let returnPromise: Promisable<TReturn> | undefined;
 
   return {
     async [Symbol.asyncDispose]() {
       await this.return();
       await options?.dispose?.();
     },
-    async return(value) {
-      if (returnValue === activeSymbol) {
-        returnValue = await value;
+    async return(value, force = true) {
+      if (returnPromise === undefined) {
+        returnPromise = Promise.resolve(value as Promisable<TReturn>);
 
-        for (const deferred of frontPressure) {
-          deferred.resolve(undefined as never);
+        // Release pending consumers
+        while (queue.locked) {
+          queue.push(returnSymbol);
         }
 
-        frontPressure.length = 0;
+        // Clear pending values
+        while (queue.size > 0) {
+          if (!force) {
+            await delay(100);
+          } else {
+            await queue.pop();
+          }
+        }
 
         // compat for runtimes without `await using`
         // 1. Users must call return() manually
@@ -67,54 +90,40 @@ export const asyncIteratorWithResolvers = <
         }
       }
 
-      return { done: true, value: returnValue as TReturn };
+      return { done: true, value: await returnPromise };
     },
     async next() {
-      if (backPressure.length > 0) {
-        return { done: false, value: await backPressure.shift()! };
+      if (returnPromise !== undefined && queue.size === 0) {
+        return { done: true, value: await returnPromise };
       }
 
-      if (returnValue !== activeSymbol) {
-        return { done: true, value: returnValue as TReturn };
-      }
+      frontPressure++;
 
-      // This allows multiple pending .next() without awaiting the previous one.
-      // `for await ... of` doesn't do that, but possible manually.
-      const deferred = Promise.withResolvers<T>();
+      const value = await queue.pop();
 
-      frontPressure.push(deferred);
+      frontPressure--;
 
-      const value = await deferred.promise;
-
-      // Happens when return() is called while waiting for value
-      if (returnValue !== activeSymbol) {
-        return { done: true, value: returnValue as TReturn };
+      if (value === returnSymbol) {
+        return { done: true, value: await returnPromise! };
       }
 
       return { done: false, value: value };
     },
     push(value: T | Promise<T>) {
-      if (returnValue !== activeSymbol) {
-        return;
-      }
-
-      if (frontPressure.length > 0) {
-        frontPressure.shift()!
-          .resolve(value);
+      if (value instanceof Promise) {
+        queue.push(value);
       } else {
-        backPressure.push(
-          Promise.resolve(value),
-        );
+        queue.push(Promise.resolve(value));
       }
     },
     get active() {
-      return returnValue === activeSymbol;
+      return returnPromise === undefined;
     },
     get backPressure() {
-      return backPressure.length;
+      return queue.size;
     },
     get frontPressure() {
-      return frontPressure.length;
+      return frontPressure;
     },
   };
 };
@@ -122,12 +131,12 @@ export const asyncIteratorWithResolvers = <
 /**
  * Async iterable iterator with manual resolvers exposed.
  */
-export interface AsyncIterableIteratorWithResolvers<
+export interface AsyncIterableWithResolvers<
   T,
   TReturn = unknown,
   TNext = unknown,
 > extends AsyncIteratorWithResolvers<T, TReturn, TNext> {
-  [Symbol.asyncIterator](): AsyncIterableIteratorWithResolvers<
+  [Symbol.asyncIterator](): AsyncIteratorWithResolvers<
     T,
     TReturn,
     TNext
@@ -145,7 +154,7 @@ export const asyncIterableIteratorWithResolvers = <
   TNext = unknown,
 >(
   options?: AsyncIteratorWithResolversOptions,
-): AsyncIterableIteratorWithResolvers<T, TReturn, TNext> => {
+): AsyncIterableWithResolvers<T, TReturn, TNext> => {
   const iterator = asyncIteratorWithResolvers<T, TReturn, TNext>(options);
 
   return {

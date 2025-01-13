@@ -7,8 +7,8 @@
 import { monotonicUlid } from "@std/ulid";
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 import type { JsonObject } from "type-fest";
-import type { AsyncIterablePipe } from "../common.ts";
 import { persisted } from "../persisted.ts";
+import type { AsyncIterablePipe } from "../pipe.ts";
 import type { PersistedMessage } from "./common.ts";
 
 /**
@@ -36,7 +36,7 @@ export const sqlite = <T>(
   database: string,
   location?: string,
 ): AsyncIterablePipe<T> => {
-  const activeDb = new WeakSet<DisposableExpoSQLite>();
+  const connections = new WeakSet<DisposableExpoSQLite>();
 
   let lastMessage: PersistedMessage | null = null;
 
@@ -61,7 +61,7 @@ export const sqlite = <T>(
           ON Messages (deletedAt);
       `);
 
-      activeDb.add(db);
+      connections.add(db);
 
       return db;
     },
@@ -91,7 +91,7 @@ export const sqlite = <T>(
         `);
       }
 
-      while (activeDb.has(this)) {
+      while (connections.has(this)) {
         const row = await this.getFirstAsync<PersistedMessage>(/* SQL */ `
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
@@ -106,8 +106,12 @@ export const sqlite = <T>(
         }
       }
     },
-    return() {
-      activeDb.delete(this);
+    async return() {
+      if (!Symbol.dispose && !Symbol.asyncDispose) {
+        await this.closeAsync();
+      }
+
+      connections.delete(this);
     },
   });
 };

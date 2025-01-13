@@ -1,6 +1,7 @@
 import { delay } from "@std/async";
-import type { AsyncIterablePipe, Promisable } from "./common.ts";
+import type { Promisable } from "type-fest";
 import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
+import type { AsyncIterablePipe } from "./pipe.ts";
 
 /**
  * Options for creating a new RetryError.

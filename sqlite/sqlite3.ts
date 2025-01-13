@@ -9,6 +9,7 @@ import { delay } from "@std/async";
 import { monotonicUlid } from "@std/ulid";
 import type { JsonObject } from "type-fest";
 import { persisted } from "../persisted.ts";
+import type { AsyncIterablePipe } from "../pipe.ts";
 import type { PersistedMessage } from "./common.ts";
 
 /**
@@ -23,10 +24,8 @@ export class DisposableSQLite3 extends Database implements Disposable {
 /**
  * Async iterable pipe with values persisted using `@db/sqlite`.
  */
-export const sqlite = <T>(filename: string): <TReturn, TNext>(
-  it: Iterable<T> | AsyncIterable<T>,
-) => AsyncGenerator<T, TReturn, TNext> => {
-  const activeDb = new WeakSet<DisposableSQLite3>();
+export const sqlite = <T>(filename: string): AsyncIterablePipe<T> => {
+  const connections = new WeakSet<DisposableSQLite3>();
 
   let lastMessage: PersistedMessage | undefined = undefined;
 
@@ -51,7 +50,7 @@ export const sqlite = <T>(filename: string): <TReturn, TNext>(
           ON Messages (deletedAt);
       `);
 
-      activeDb.add(db);
+      connections.add(db);
 
       return db;
     },
@@ -81,7 +80,7 @@ export const sqlite = <T>(filename: string): <TReturn, TNext>(
         `;
       }
 
-      while (activeDb.has(this)) {
+      while (connections.has(this)) {
         [lastMessage] = this.sql<PersistedMessage>`
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
@@ -97,7 +96,11 @@ export const sqlite = <T>(filename: string): <TReturn, TNext>(
       }
     },
     return() {
-      activeDb.delete(this);
+      if (!Symbol.dispose && !Symbol.asyncDispose) {
+        this.close();
+      }
+
+      connections.delete(this);
     },
   });
 };

@@ -1,14 +1,15 @@
-import type { Promisable } from "./common.ts";
+import type { Promisable } from "type-fest";
+import type { AsyncIterablePipe } from "./pipe.ts";
 
 export type PersistedOptions<
-  Message,
+  T,
   Storage extends Disposable | AsyncDisposable,
 > = {
   initialize: () => Promisable<Storage>;
   /** Persists incoming messages to storage. */
-  enqueue: (this: Storage, message: Message) => Promisable<void>;
+  enqueue: (this: Storage, message: T) => Promisable<void>;
   /** Returns the next message when available, or `undefined` to exit. */
-  dequeue: (this: Storage) => Promisable<Message | void>;
+  dequeue: (this: Storage) => Promisable<T | void>;
   /** Stops a pending dequeue when upstream iterator is closed. */
   return?: (this: Storage) => Promisable<void>;
 };
@@ -23,30 +24,26 @@ export type PersistedOptionsInitializable<Message> = {
   return?: () => Promisable<void>;
 };
 
-export type PersistedReturnType<T> = <TReturn, TNext>(
-  iterable:
-    | Iterable<T, TReturn, TNext>
-    | AsyncIterable<T, TReturn, TNext>,
-) => AsyncGenerator<T, TReturn, TNext>;
-
-export function persisted<Message>(
-  options: PersistedOptionsInitializable<Message>,
-): PersistedReturnType<Message>;
 export function persisted<
-  Message,
+  T,
+>(
+  options: PersistedOptionsInitializable<T>,
+): AsyncIterablePipe<T>;
+export function persisted<
+  T,
   Storage extends Disposable | AsyncDisposable,
->(options: PersistedOptions<Message, Storage>): PersistedReturnType<Message>;
+>(
+  options: PersistedOptions<T, Storage>,
+): AsyncIterablePipe<T>;
 export function persisted<
-  Message,
+  T,
   Storage extends Disposable | AsyncDisposable,
 >(
   options:
-    | PersistedOptions<Message, Storage>
-    | PersistedOptionsInitializable<Message>,
-) {
-  return async function* (
-    iterable: Iterable<Message> | AsyncIterable<Message>,
-  ) {
+    | PersistedOptions<T, Storage>
+    | PersistedOptionsInitializable<T>,
+): AsyncIterablePipe<T> {
+  return async function* (iterable) {
     // Initialize storage at this scope to allow cleanup on exit.
     await using db = await options.initialize?.();
 
@@ -61,7 +58,9 @@ export function persisted<
     while (true) {
       const message = await options.dequeue.call(db!);
 
-      if (message === undefined) break;
+      if (message === undefined) {
+        break;
+      }
 
       yield message;
     }

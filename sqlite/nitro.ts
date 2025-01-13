@@ -17,8 +17,8 @@ import {
   type Transaction,
 } from "react-native-nitro-sqlite";
 import type { JsonObject } from "type-fest";
-import type { AsyncIterablePipe } from "../common.ts";
 import { persisted } from "../persisted.ts";
+import type { AsyncIterablePipe } from "../pipe.ts";
 import type { PersistedMessage } from "./common.ts";
 
 /**
@@ -78,7 +78,7 @@ export const sqlite = <T>(
   database: string,
   location?: string,
 ): AsyncIterablePipe<T> => {
-  const activeDb = new WeakSet<DisposableNitroSQLite>();
+  const connections = new WeakSet<DisposableNitroSQLite>();
 
   let lastMessage: PersistedMessage | undefined = undefined;
 
@@ -103,7 +103,7 @@ export const sqlite = <T>(
           ON Messages (deletedAt);
       `);
 
-      activeDb.add(db);
+      connections.add(db);
 
       return db;
     },
@@ -133,7 +133,7 @@ export const sqlite = <T>(
         `);
       }
 
-      while (activeDb.has(this)) {
+      while (connections.has(this)) {
         const { rows } = await this.execute<PersistedMessage>(/* SQL */ `
           SELECT * FROM Messages
           WHERE deletedAt IS NULL
@@ -149,7 +149,11 @@ export const sqlite = <T>(
       }
     },
     return() {
-      activeDb.delete(this);
+      if (!Symbol.dispose && !Symbol.asyncDispose) {
+        this.close();
+      }
+
+      connections.delete(this);
     },
   });
 };

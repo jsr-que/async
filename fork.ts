@@ -1,27 +1,33 @@
-import { delay } from "@std/async";
-import type { AsyncIterablePipe } from "./common.ts";
+import { MuxAsyncIterator } from "@std/async";
 import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
+import type { AsyncIterablePipe } from "./pipe.ts";
 
 /**
  * Forks the source iterable into two branches.
  */
 export const fork = <T, U>(
   branch: AsyncIterablePipe<T, U>,
-): AsyncIterablePipe<T> =>
-  async function* (source) {
-    await using branchSource = asyncIterableIteratorWithResolvers<T>();
+): AsyncIterablePipe<T, T | U> =>
+  async function* (iterable) {
+    await using branchIt = asyncIterableIteratorWithResolvers<T>();
+    await using masterIt = asyncIterableIteratorWithResolvers<T>();
 
-    branch(branchSource);
-
-    for await (const value of source) {
-      while (branchSource.backPressure > 5) {
-        await delay(80);
+    (async () => {
+      for await (const value of iterable) {
+        branchIt.push(value);
+        masterIt.push(value);
       }
 
-      branchSource.push(value);
+      await Promise.allSettled([
+        branchIt.return(undefined, false),
+        masterIt.return(undefined, false),
+      ]);
+    })();
 
-      yield value;
-    }
+    const mux = new MuxAsyncIterator<T | U>();
 
-    branchSource.return();
+    mux.add(masterIt);
+    mux.add(branch(branchIt));
+
+    yield* mux;
   };

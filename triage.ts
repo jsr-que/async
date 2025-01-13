@@ -1,6 +1,6 @@
 import { MuxAsyncIterator } from "@std/async";
-import type { AsyncIterablePipe } from "./common.ts";
 import { asyncIterableIteratorWithResolvers } from "./iterator.ts";
+import type { AsyncIterablePipe } from "./pipe.ts";
 
 /**
  * Branches an iterator value when the value passes the provided filter
